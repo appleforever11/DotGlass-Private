@@ -1,0 +1,6 @@
+{
+  "repository": "appleforever11/DotGlass-Private",
+  "feedURL": "https://raw.githubusercontent.com/appleforever11/DotGlass-Private/main/distribution/appcast.xml",
+  "sparkleKeyAccount": "dot-glass-personal",
+  "minimumSystemVersion": "14.0"
+}
