@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Sparkle
 
 @main
 struct DotGlassInstaller: App {
@@ -28,21 +29,30 @@ struct DotGlassInstaller: App {
         let folder = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/DockDoorPro/Widgets")
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent("DotGlassPersonal.bundle")
-        if fm.fileExists(atPath: target.path), Bundle(url: target)?.bundleIdentifier != "dot-glass-personal" { throw InstallError.wrongTarget }
+        if fm.fileExists(atPath: target.path) {
+            guard let existing = Bundle(url: target), existing.bundleIdentifier == "dot-glass-personal" else { throw InstallError.wrongTarget }
+            let installed = existing.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+            let incoming = Bundle(url: source)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+            guard SUStandardVersionComparator.default.compareVersion(installed, toVersion: incoming) != .orderedDescending else { throw InstallError.olderPayload }
+        }
         let staging = folder.appendingPathComponent(".dot-glass-\(UUID().uuidString).bundle")
         try fm.copyItem(at: source, to: staging)
         defer { try? fm.removeItem(at: staging) }
         if fm.fileExists(atPath: target.path) {
-            _ = try fm.replaceItemAt(target, withItemAt: staging, backupItemName: "DotGlassPersonal-previous.bundle", options: .withoutDeletingBackupItem)
+            let backupRoot = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/DotGlassPersonal/Backups")
+            try fm.createDirectory(at: backupRoot, withIntermediateDirectories: true)
+            try fm.copyItem(at: target, to: backupRoot.appendingPathComponent("\(UUID().uuidString).bundle"))
+            _ = try fm.replaceItemAt(target, withItemAt: staging)
         } else { try fm.moveItem(at: staging, to: target) }
     }
 }
 
 private enum InstallError: LocalizedError {
-    case invalidPayload, wrongTarget
+    case invalidPayload, wrongTarget, olderPayload
     var errorDescription: String? {
         switch self {
         case .invalidPayload: "The personal widget payload is missing or invalid."
+        case .olderPayload: "A newer personal widget is already installed. Nothing was changed."
         case .wrongTarget: "Another widget occupies the personal install location. Nothing was changed."
         }
     }
